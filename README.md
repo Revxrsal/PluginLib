@@ -179,5 +179,5 @@ public class ExamplePlugin extends DependentJavaPlugin {
 
 Notice that we did not directly put `com.github.benmanes`, and instead `com#github#benmanes`. This way, we will be able to outsmart build system relocation, and will not have this very string literal relocated.
 
-# Full examples
-You can view full examples in **maven** and **gradle** branches.
+# Full examples  
+You can view full examples in **[maven](https://github.com/ReflxctionDev/PluginLib/tree/maven)** and **[gradle](https://github.com/ReflxctionDev/PluginLib/tree/gradle)** branches.
