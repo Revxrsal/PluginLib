@@ -113,6 +113,14 @@ gradle-app.setting
 
 # Common working directory
 run/
+examples/
 
 # Avoid ignoring Gradle wrapper jar file (.jar files are usually ignored)
 !gradle-wrapper.jar
+copier.bat
+examples/maven/.gitignore
+examples/maven/pom.xml
+examples/maven/src/
+src/main/java/org/
+src/main/resources/
+src/test/

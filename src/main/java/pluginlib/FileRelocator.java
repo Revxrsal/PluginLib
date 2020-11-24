@@ -57,7 +57,7 @@ public abstract class FileRelocator {
     public static void remap(File input, File output, Set<Relocation> relocations) throws Exception {
         Map<String, String> mappings = new HashMap<>();
         for (Relocation relocation : relocations) {
-            mappings.put(relocation.pattern, relocation.newPattern);
+            mappings.put(relocation.getPath(), relocation.getNewPath());
         }
 
         // create and invoke a new relocator

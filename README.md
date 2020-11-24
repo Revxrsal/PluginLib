@@ -41,7 +41,7 @@ Unless explicitly specified, **dependencies will be downloaded from Maven Centra
       version: 4.2.0_222
       repository: https://jcenter.bintray.com/
 ```
-This way, JDA will be downloaded from JCenter Bintray's repository.
+This way, JDA will be downloaded from Bintray JCenter's repository.
 
 There are multiple ways to define a library, aside from defining the library properties (group id, artifact id, etc) 
 
@@ -158,13 +158,11 @@ import pluginlib.Relocation;
   
 public class ExamplePlugin extends DependentJavaPlugin {  
   
-  private static final String RELOCATION_PREFIX = "org.example.libs";  
-  
   private static final PluginLib CAFFEINE = PluginLib.builder()  
   .groupId("com.github.ben-manes.caffeine")  
   .artifactId("caffeine")  
   .version("2.8.6")  
-  .relocate(Relocation.of(RELOCATION_PREFIX, "caffeine", "com#github#benmanes#caffeine"))  
+  .relocate(new Relocation("com/github/benmanes/caffeine", "org.example.libs.caffeine"))  
   .build();  
   
   static {  

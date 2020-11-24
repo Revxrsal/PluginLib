@@ -380,12 +380,13 @@ public class PluginLib {
             if (options.librariesFolder != null && !options.librariesFolder.isEmpty())
                 folder = options.librariesFolder;
             String prefix = options.relocationPrefix == null ? null : options.relocationPrefix;
+            Objects.requireNonNull(prefix, "relocation-prefix must be defined in runtime-libraries!");
             for (Entry<String, RuntimeLib> lib : options.libraries.entrySet()) {
                 RuntimeLib runtimeLib = lib.getValue();
                 Builder b = runtimeLib.builder();
                 if (runtimeLib.relocation != null && !runtimeLib.relocation.isEmpty())
                     for (Entry<String, String> s : runtimeLib.relocation.entrySet()) {
-                        b.relocate(Relocation.of(Objects.requireNonNull(prefix, "relocation-prefix must be defined in runtime-libraries!"), s.getKey(), s.getValue()));
+                        b.relocate(new Relocation(s.getValue(), prefix + s.getKey()));
                     }
                 toInstall.add(b.build());
             }

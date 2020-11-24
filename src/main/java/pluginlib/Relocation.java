@@ -1,7 +1,5 @@
 package pluginlib;
 
-import org.jetbrains.annotations.NotNull;
-
 import java.util.Objects;
 
 /**
@@ -11,42 +9,40 @@ import java.util.Objects;
  */
 public final class Relocation {
 
-    public final String newPattern, pattern;
-
-    private Relocation(String newPattern, String pattern) {
-        this.newPattern = newPattern;
-        this.pattern = pattern;
-    }
+    private final String path, newPath;
 
     /**
-     * Creates a new relocation rule.
+     * Creates a new relocation rule
      *
-     * @param prefix  The prefix of the relocation.
-     * @param id      ID of the library.
-     * @param pattern Path or pattern to replace all occurences with <code>prefix.id</code>
-     * @return The new relocation rule
+     * @param path    Path to relocate
+     * @param newPath New path to replace it
      */
-    public static Relocation of(String prefix, @NotNull String id, @NotNull String pattern) {
-        return new Relocation(prefix + "." + id, pattern.replace('#', '.'));
+    public Relocation(String path, String newPath) {
+        this.path = path.replace('/', '.').replace('#', '.');
+        this.newPath = newPath.replace('/', '.').replace('#', '.');
+    }
+
+    public String getPath() {
+        return path;
+    }
+
+    public String getNewPath() {
+        return newPath;
     }
 
     @Override public String toString() {
-        return "Relocation{" +
-                "newPattern='" + newPattern + '\'' +
-                ", pattern='" + pattern + '\'' +
-                '}';
+        return String.format("Relocation{path='%s', newPath='%s'}", path, newPath);
     }
 
     @Override public boolean equals(Object o) {
         if (this == o) return true;
         if (!(o instanceof Relocation)) return false;
         Relocation that = (Relocation) o;
-        return Objects.equals(newPattern, that.newPattern) &&
-                Objects.equals(pattern, that.pattern);
+        return Objects.equals(path, that.path) &&
+                Objects.equals(newPath, that.newPath);
     }
 
     @Override public int hashCode() {
-        return Objects.hash(newPattern, pattern);
+        return Objects.hash(path, newPath);
     }
-
 }
