@@ -7,6 +7,9 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+/**
+ * Utility class that handles relocation
+ */
 public abstract class FileRelocator {
 
     private static final PluginLib asm = PluginLib.builder()
@@ -30,7 +33,12 @@ public abstract class FileRelocator {
     private static Constructor<?> relocatorConstructor;
     private static Method relocateMethod;
 
-    public static void load(Class<? extends DependantJavaPlugin> clazz) {
+    /**
+     * Loads all the required libraries for relocation
+     *
+     * @param clazz Class that extends {@link DependentJavaPlugin}.
+     */
+    public static void load(Class<? extends DependentJavaPlugin> clazz) {
         asm.load(clazz);
         asm_commons.load(clazz);
         jarRelocator.load(clazz);

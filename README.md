@@ -41,7 +41,7 @@ Unless explicitly specified, **dependencies will be downloaded from Maven Centra
       version: 4.2.0_222
       repository: https://jcenter.bintray.com/
 ```
-This way, JDA will be downloaded from JitPack's repository.
+This way, JDA will be downloaded from JCenter Bintray's repository.
 
 There are multiple ways to define a library, aside from defining the library properties (group id, artifact id, etc) 
 

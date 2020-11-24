@@ -4,6 +4,11 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.Objects;
 
+/**
+ * Represents a relocation rule.
+ * <p>
+ * This class is immutable, hence is safe to share across threads.
+ */
 public final class Relocation {
 
     public final String newPattern, pattern;
@@ -11,6 +16,18 @@ public final class Relocation {
     private Relocation(String newPattern, String pattern) {
         this.newPattern = newPattern;
         this.pattern = pattern;
+    }
+
+    /**
+     * Creates a new relocation rule.
+     *
+     * @param prefix  The prefix of the relocation.
+     * @param id      ID of the library.
+     * @param pattern Path or pattern to replace all occurences with <code>prefix.id</code>
+     * @return The new relocation rule
+     */
+    public static Relocation of(String prefix, @NotNull String id, @NotNull String pattern) {
+        return new Relocation(prefix + "." + id, pattern.replace('#', '.'));
     }
 
     @Override public String toString() {
@@ -30,18 +47,6 @@ public final class Relocation {
 
     @Override public int hashCode() {
         return Objects.hash(newPattern, pattern);
-    }
-
-    public static Relocation of(String prefix, @NotNull String id, @NotNull String pattern) {
-        return new Relocation(prefix + id, pattern.replace('#', '.'));
-    }
-
-    public static String without(@NotNull String pattern) {
-        return pattern.replace('#', '.');
-    }
-
-    public static String without(@NotNull char... pattern) {
-        return new String(pattern);
     }
 
 }

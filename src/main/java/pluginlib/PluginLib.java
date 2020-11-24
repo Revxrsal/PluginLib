@@ -5,7 +5,6 @@ import com.google.common.collect.ImmutableSet;
 import com.google.gson.Gson;
 import com.google.gson.annotations.SerializedName;
 import org.bukkit.Bukkit;
-import org.bukkit.plugin.java.JavaPlugin;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.NotNull;
 import org.w3c.dom.Document;
@@ -29,41 +28,19 @@ import java.util.function.Supplier;
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static java.util.Objects.requireNonNull;
 
+/**
+ * Represents a runtime-downloaded plugin library.
+ * <p>
+ * This class is immutable, hence is thread-safe. However, certain methods like {@link #load(Class)} are
+ * most likely <em>not thread-safe</em>.
+ */
 public class PluginLib {
-
-    private static final List<PluginLib> toInstall = new ArrayList<>();
-
-    @SuppressWarnings("ConstantConditions")
-    private static final Supplier<File> libFile = Suppliers.memoize(() -> {
-        Map<?, ?> map = (Map<?, ?>) new Yaml().load(new InputStreamReader(DependantJavaPlugin.class.getClassLoader().getResourceAsStream("plugin.yml")));
-        String name = map.get("name").toString();
-        String folder = "libs";
-        if (map.containsKey("runtime-libraries")) {
-            Gson gson = new Gson();
-            LibrariesOptions options = gson.fromJson(gson.toJson(map.get("runtime-libraries")), LibrariesOptions.class);
-            if (options.librariesFolder != null && !options.librariesFolder.isEmpty())
-                folder = options.librariesFolder;
-            String prefix = options.relocationPrefix == null ? null : options.relocationPrefix + ".";
-            for (Entry<String, RuntimeLib> lib : options.libraries.entrySet()) {
-                RuntimeLib runtimeLib = lib.getValue();
-                Builder b = runtimeLib.builder();
-                if (runtimeLib.relocation != null && !runtimeLib.relocation.isEmpty())
-                    for (Entry<String, String> s : runtimeLib.relocation.entrySet()) {
-                        b.relocate(Relocation.of(Objects.requireNonNull(prefix, "relocation-prefix must be defined in runtime-libraries!"), s.getKey(), s.getValue()));
-                    }
-                toInstall.add(b.build());
-            }
-        }
-        File file = new File(Bukkit.getUpdateFolderFile().getParentFile() + File.separator + name, folder);
-        file.mkdirs();
-        return file;
-    })::get;
 
     public final String groupId, artifactId, version, repository;
     public final ImmutableSet<Relocation> relocationRules;
     private final boolean hasRelocations;
 
-    public PluginLib(String groupId, String artifactId, String version, String repository, ImmutableSet<Relocation> relocationRules) {
+    PluginLib(String groupId, String artifactId, String version, String repository, ImmutableSet<Relocation> relocationRules) {
         this.groupId = groupId;
         this.artifactId = artifactId;
         this.version = version;
@@ -72,25 +49,32 @@ public class PluginLib {
         hasRelocations = !relocationRules.isEmpty();
     }
 
+    /**
+     * Creates a standard builder
+     *
+     * @return The newly created builder.
+     */
     public static Builder builder() {
         return new Builder();
     }
 
-    public URL asURL() throws MalformedURLException {
-        String repo = repository;
-        if (!repo.endsWith("/")) {
-            repo += "/";
-        }
-        repo += "%s/%s/%s/%s-%s.jar";
-
-        String url = String.format(repo, groupId.replace(".", "/"), artifactId, version, artifactId, version);
-        return new URL(url);
-    }
-
+    /**
+     * Returns a new {@link Builder} that downloads its dependency from a URL.
+     *
+     * @param url URL to download
+     * @return The newly created builder
+     */
     public static Builder fromURL(@NotNull String url) {
         return new Builder().fromURL(url);
     }
 
+    /**
+     * Returns a new {@link Builder}
+     *
+     * @param xml XML to parse. Must be exactly like the one in maven.
+     * @return A new {@link Builder} instance, derived from the XML.
+     * @throws IllegalArgumentException If the specified XML cannot be parsed.
+     */
     public static Builder parseXML(@Language("XML") @NotNull String xml) {
         try {
             DocumentBuilder builder = DocumentBuilderFactory.newInstance().newDocumentBuilder();
@@ -106,12 +90,16 @@ public class PluginLib {
         }
     }
 
-    public void load(Class<? extends JavaPlugin> clazz) {
+    /**
+     * Loads this library and handles any relocations if any.
+     *
+     * @param clazz Class to use its {@link ClassLoader} to load.
+     */
+    public void load(Class<? extends DependentJavaPlugin> clazz) {
         String name = artifactId + "-" + version;
         File parent = libFile.get();
         File saveLocation = new File(parent, name + ".jar");
         if (!saveLocation.exists()) {
-
             try {
                 URL url = asURL();
                 saveLocation.createNewFile();
@@ -121,13 +109,11 @@ public class PluginLib {
             } catch (Exception e) {
                 e.printStackTrace();
             }
-
         }
         if (!saveLocation.exists()) {
             throw new RuntimeException("Unable to download dependency: " + artifactId);
         }
         if (hasRelocations) {
-            System.out.println(relocationRules);
             File relocated = new File(parent, name + "-relocated.jar");
             if (!relocated.exists()) {
                 try {
@@ -139,7 +125,6 @@ public class PluginLib {
             }
             saveLocation = relocated;
         }
-
         URLClassLoader classLoader = (URLClassLoader) clazz.getClassLoader();
         try {
             addURL.invoke(classLoader, saveLocation.toURI().toURL());
@@ -148,15 +133,21 @@ public class PluginLib {
         }
     }
 
-    private static Method addURL;
-
-    static {
-        try {
-            addURL = URLClassLoader.class.getDeclaredMethod("addURL", URL.class);
-            addURL.setAccessible(true);
-        } catch (NoSuchMethodException e) {
-            e.printStackTrace();
+    /**
+     * Creates a download {@link URL} for this library.
+     *
+     * @return The dependency URL
+     * @throws MalformedURLException If the URL is malformed.
+     */
+    public URL asURL() throws MalformedURLException {
+        String repo = repository;
+        if (!repo.endsWith("/")) {
+            repo += "/";
         }
+        repo += "%s/%s/%s/%s-%s.jar";
+
+        String url = String.format(repo, groupId.replace(".", "/"), artifactId, version, artifactId, version);
+        return new URL(url);
     }
 
     @Override public String toString() {
@@ -170,6 +161,17 @@ public class PluginLib {
                 '}';
     }
 
+    private static Method addURL;
+
+    static {
+        try {
+            addURL = URLClassLoader.class.getDeclaredMethod("addURL", URL.class);
+            addURL.setAccessible(true);
+        } catch (NoSuchMethodException e) {
+            e.printStackTrace();
+        }
+    }
+
     public static class Builder {
 
         private String url = null;
@@ -179,50 +181,112 @@ public class PluginLib {
         protected Builder() {
         }
 
+        /**
+         * Sets the builder to create a static URL dependency.
+         *
+         * @param url URL of the dependency.
+         * @return This builder
+         */
         public Builder fromURL(@NotNull String url) {
-            this.url = requireNonNull(url);
+            this.url = n(url, "provided URL is null!");
             return this;
         }
 
+        /**
+         * Sets the group ID of the dependency
+         *
+         * @param group New group ID to set
+         * @return This builder
+         */
         public Builder groupId(@NotNull String group) {
-            this.group = requireNonNull(group);
+            this.group = n(group, "groupId is null!");
             return this;
         }
 
+        /**
+         * Sets the artifact ID of the dependency
+         *
+         * @param artifact New artifact ID to set
+         * @return This builder
+         */
         public Builder artifactId(@NotNull String artifact) {
-            this.artifact = requireNonNull(artifact);
+            this.artifact = n(artifact, "artifactId is null!");
             return this;
         }
 
+        /**
+         * Sets the version of the dependency
+         *
+         * @param version New version to set
+         * @return This builder
+         */
         public Builder version(@NotNull String version) {
-            this.version = requireNonNull(version);
+            this.version = n(version, "version is null!");
             return this;
         }
 
+        /**
+         * Sets the version of the dependency, by providing the major, minor, build numbers
+         *
+         * @param numbers An array of numbers to join using "."
+         * @return This builder
+         */
         public Builder version(int... numbers) {
             StringJoiner version = new StringJoiner(".");
-            for (int i : numbers) version.add(i + "");
+            for (int i : numbers) version.add(Integer.toString(i));
             return version(version.toString());
         }
 
+        /**
+         * Sets the repository to download the dependency from
+         *
+         * @param repository New repository to set
+         * @return This builder
+         */
         public Builder repository(@NotNull String repository) {
             this.repository = requireNonNull(repository);
             return this;
         }
 
+        /**
+         * A convenience method to set the repository to <em>JitPack</em>
+         *
+         * @return This builder
+         */
         public Builder jitpack() {
             return repository("https://jitpack.io/");
         }
 
+        /**
+         * A convenience method to set the repository to <em>Bintray - JCenter</em>
+         *
+         * @return This builder
+         */
+        public Builder jcenter() {
+            return repository("https://jcenter.bintray.com/");
+        }
+
+        /**
+         * Adds a new relocation rule
+         *
+         * @param relocation New relocation rule to add
+         * @return This builder
+         */
         public Builder relocate(@NotNull Relocation relocation) {
             relocations.add(n(relocation, "relocation is null!"));
             return this;
         }
 
+        /**
+         * Constructs a {@link PluginLib} from the provided values
+         *
+         * @return A new, immutable {@link PluginLib} instance.
+         * @throws NullPointerException if any of the required properties is not provided.
+         */
         public PluginLib build() {
             if (url != null)
-                return new StaticURLPluginLib(group, n(artifact, "artifact"), version, repository, relocations.build(), url);
-            return new PluginLib(n(group, "group"), n(artifact, "artifact"), n(version, "version"), n(repository, "repository"), relocations.build());
+                return new StaticURLPluginLib(group, n(artifact, "artifactId"), n(version, "version"), repository, relocations.build(), url);
+            return new PluginLib(n(group, "groupId"), n(artifact, "artifactId"), n(version, "version"), n(repository, "repository"), relocations.build());
         }
 
         private static <T> T n(T t, String m) {
@@ -231,6 +295,12 @@ public class PluginLib {
 
     }
 
+    /**
+     * A convenience method to check whether a class exists at runtime or not.
+     *
+     * @param className Class name to check for
+     * @return true if the class exists, false if otherwise.
+     */
     public static boolean classExists(@NotNull String className) {
         try {
             Class.forName(className);
@@ -240,10 +310,12 @@ public class PluginLib {
         }
     }
 
+    private static final List<PluginLib> toInstall = new ArrayList<>();
+
     static void loadLibs() {
         libFile.get();
         for (PluginLib pluginLib : toInstall) {
-            pluginLib.load(DependantJavaPlugin.class);
+            pluginLib.load(DependentJavaPlugin.class);
         }
     }
 
@@ -296,5 +368,31 @@ public class PluginLib {
             return new URL(url);
         }
     }
+
+    @SuppressWarnings("ConstantConditions")
+    private static final Supplier<File> libFile = Suppliers.memoize(() -> {
+        Map<?, ?> map = (Map<?, ?>) new Yaml().load(new InputStreamReader(DependentJavaPlugin.class.getClassLoader().getResourceAsStream("plugin.yml")));
+        String name = map.get("name").toString();
+        String folder = "libs";
+        if (map.containsKey("runtime-libraries")) {
+            Gson gson = new Gson();
+            LibrariesOptions options = gson.fromJson(gson.toJson(map.get("runtime-libraries")), LibrariesOptions.class);
+            if (options.librariesFolder != null && !options.librariesFolder.isEmpty())
+                folder = options.librariesFolder;
+            String prefix = options.relocationPrefix == null ? null : options.relocationPrefix;
+            for (Entry<String, RuntimeLib> lib : options.libraries.entrySet()) {
+                RuntimeLib runtimeLib = lib.getValue();
+                Builder b = runtimeLib.builder();
+                if (runtimeLib.relocation != null && !runtimeLib.relocation.isEmpty())
+                    for (Entry<String, String> s : runtimeLib.relocation.entrySet()) {
+                        b.relocate(Relocation.of(Objects.requireNonNull(prefix, "relocation-prefix must be defined in runtime-libraries!"), s.getKey(), s.getValue()));
+                    }
+                toInstall.add(b.build());
+            }
+        }
+        File file = new File(Bukkit.getUpdateFolderFile().getParentFile() + File.separator + name, folder);
+        file.mkdirs();
+        return file;
+    })::get;
 
 }
