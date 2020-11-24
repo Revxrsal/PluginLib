@@ -1,0 +1,13 @@
+name: MavenExample
+version: ${project.version}
+main: org.example.maven.MavenExample
+runtime-libraries:
+  relocation-prefix: 'org.example.maven.libs'
+  libraries-folder: 'libraries'
+  libraries:
+    caffeine: # Caffeine's library
+      groupId: 'com.github.ben-manes.caffeine'
+      artifactId: 'caffeine'
+      version: 2.8.6
+      relocation:
+        caffeine: 'com.github.benmanes.caffeine'
