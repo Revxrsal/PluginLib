@@ -1,0 +1,42 @@
+import org.apache.tools.ant.filters.ReplaceTokens
+
+plugins {
+    id 'com.github.johnrengelman.shadow' version '5.2.0'
+}
+
+apply plugin: 'java'
+
+group = 'org.example'
+version = '1.0-SNAPSHOT'
+
+sourceCompatibility = '1.8'
+targetCompatibility = '1.8'
+
+repositories {
+    mavenCentral()
+    maven { url 'https://hub.spigotmc.org/nexus/content/repositories/snapshots/' }
+    maven { url 'https://oss.sonatype.org/content/groups/public/' }
+    maven { url 'https://jitpack.io/' }
+}
+
+dependencies {
+    compileOnly 'org.spigotmc:spigot-api:1.16.4-R0.1-SNAPSHOT'
+    compile 'com.github.ReflxctionDev:PluginLib:50fd7f5c7a'
+
+    // an example library, caffeine in this case.
+    compileOnly 'com.github.ben-manes.caffeine:caffeine:2.8.6'
+
+}
+
+processResources {
+    from(sourceSets.main.resources.srcDirs) {
+        filter ReplaceTokens, tokens: [version: version]
+    }
+}
+
+shadowJar {
+    relocate 'pluginlib', 'org.example.gradle.pluginlib'
+    relocate 'com.github.benmanes.caffeine', 'org.example.gradle.libs.caffeine'
+}
+
+build.dependsOn shadowJar

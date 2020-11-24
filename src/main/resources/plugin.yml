@@ -1,0 +1,14 @@
+name: GradleExample
+version: @version@
+main: org.example.gradle.GradleExample
+api-version: 1.16
+runtime-libraries:
+  relocation-prefix: 'org.example.gradle.libs'
+  libraries-folder: 'libraries'
+  libraries:
+    caffeine: # Caffeine's library
+      groupId: 'com.github.ben-manes.caffeine'
+      artifactId: 'caffeine'
+      version: 2.8.6
+      relocation:
+        caffeine: 'com.github.benmanes.caffeine'
