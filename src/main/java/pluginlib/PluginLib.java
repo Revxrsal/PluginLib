@@ -386,7 +386,7 @@ public class PluginLib {
                 Builder b = runtimeLib.builder();
                 if (runtimeLib.relocation != null && !runtimeLib.relocation.isEmpty())
                     for (Entry<String, String> s : runtimeLib.relocation.entrySet()) {
-                        b.relocate(new Relocation(s.getValue(), prefix + s.getKey()));
+                        b.relocate(new Relocation(s.getValue(), prefix + "." + s.getKey()));
                     }
                 toInstall.add(b.build());
             }
