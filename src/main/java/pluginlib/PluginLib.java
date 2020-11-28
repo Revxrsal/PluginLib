@@ -277,6 +277,15 @@ public class PluginLib {
         }
 
         /**
+         * A convenience method to set the repository to <em>Aikar's Repository</em>
+         *
+         * @return This builder
+         */
+        public Builder aikar() {
+            return repository("https://repo.aikar.co/content/groups/aikar/");
+        }
+
+        /**
          * Adds a new relocation rule
          *
          * @param relocation New relocation rule to add
