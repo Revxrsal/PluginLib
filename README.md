@@ -97,7 +97,7 @@ public class ExamplePlugin extends DependentJavaPlugin {
       .build();  
   
   static {  
-  CAFFEINE.load(ExamplePlugin.class);  
+        CAFFEINE.load(ExamplePlugin.class);  
   }  
   
 }
@@ -117,13 +117,13 @@ private static final PluginLib CAFFEINE = PluginLib.parseXML(
 And, we can also parse the library from a URL:
 ```java
 private static final PluginLib TIMINGS = PluginLib  
-  .fromURL("https://repo.aikar.co/nexus/content/groups/aikar/co/aikar/minecraft-timings/1.0.4/minecraft-timings-1.0.4.jar")  
-  .artifactId("timings")  
-  .version("1.0.4")  
-  .build();  
+        .fromURL("https://repo.aikar.co/nexus/content/groups/aikar/co/aikar/minecraft-timings/1.0.4/minecraft-timings-1.0.4.jar")  
+        .artifactId("timings")  
+        .version("1.0.4")  
+        .build();  
   
 static {  
-  TIMINGS.load(ExamplePlugin.class);  
+    TIMINGS.load(ExamplePlugin.class);  
 }
 ```
 
@@ -141,7 +141,7 @@ In our library's definition, we simply add the `relocation` section
     version: 4.2.0_222  
     repository: https://jcenter.bintray.com/  
     relocation:  
-      jda: 'net.dv8tion.jda'
+      net.dv8tion.jda: jda
 ```
 Relocation follows the following template:
 `<library name>: 'path to replace'`
@@ -159,25 +159,25 @@ import pluginlib.Relocation;
 public class ExamplePlugin extends DependentJavaPlugin {  
   
   private static final PluginLib CAFFEINE = PluginLib.builder()  
-  .groupId("com.github.ben-manes.caffeine")  
-  .artifactId("caffeine")  
-  .version("2.8.6")  
-  .relocate(new Relocation("com/github/benmanes/caffeine", "org.example.libs.caffeine"))  
-  .build();  
+        .groupId("com.github.ben-manes.caffeine")
+        .artifactId("caffeine")
+        .version("2.8.6")
+        .relocate(new Relocation("com/github/benmanes/caffeine", "org.example.libs.caffeine"))
+        .build();
   
   static {  
-  CAFFEINE.load(ExamplePlugin.class);  
+      CAFFEINE.load(ExamplePlugin.class);  
   }  
 }
 ```
 
 
-**Very important note**: Relocating using plugin.yml or code **is not enough!** You must tell your build system (Maven or Gradle) to relocate paths in your code as well.
+**Very important note**: Relocating using plugin.yml or code **is not enough!** You must tell your build system (Maven or Gradle) to relocate references in your code as well.
 
 * Relocating in **[Maven](https://maven.apache.org/plugins/maven-shade-plugin/examples/class-relocation.html)**
 * Relocating in **[Gradle](https://imperceptiblethoughts.com/shadow/configuration/relocation/)**
 
-Notice that we did not directly put `com.github.benmanes`, and instead `com#github#benmanes`. This way, we will be able to outsmart build system relocation, and will not have this very string literal relocated.
+Notice that we did not directly put `com.github.benmanes`, and instead `com/github/benmanes`. This way, we will be able to outsmart build system relocation, and will not have this very string literal relocated.
 
 # Full examples  
 You can view full examples in **[maven](https://github.com/ReflxctionDev/PluginLib/tree/maven)** and **[gradle](https://github.com/ReflxctionDev/PluginLib/tree/gradle)** branches.

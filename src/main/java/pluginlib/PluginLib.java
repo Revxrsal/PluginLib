@@ -1,5 +1,6 @@
 package pluginlib;
 
+import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
 import com.google.gson.Gson;
@@ -23,7 +24,6 @@ import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.Map.Entry;
-import java.util.function.Supplier;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static java.util.Objects.requireNonNull;
@@ -40,7 +40,7 @@ public class PluginLib {
     public final ImmutableSet<Relocation> relocationRules;
     private final boolean hasRelocations;
 
-    PluginLib(String groupId, String artifactId, String version, String repository, ImmutableSet<Relocation> relocationRules) {
+    public PluginLib(String groupId, String artifactId, String version, String repository, ImmutableSet<Relocation> relocationRules) {
         this.groupId = groupId;
         this.artifactId = artifactId;
         this.version = version;
@@ -125,8 +125,9 @@ public class PluginLib {
             }
             saveLocation = relocated;
         }
-        URLClassLoader classLoader = (URLClassLoader) clazz.getClassLoader();
+
         try {
+            URLClassLoader classLoader = (URLClassLoader) clazz.getClassLoader();
             addURL.invoke(classLoader, saveLocation.toURI().toURL());
         } catch (Exception e) {
             throw new RuntimeException("Unable to load dependency: " + saveLocation.toString(), e);
@@ -267,6 +268,15 @@ public class PluginLib {
         }
 
         /**
+         * A convenience method to set the repository to <em>Maven Central</em>
+         *
+         * @return This builder
+         */
+        public Builder mavenCentral() {
+            return repository("https://repo1.maven.org/maven2/");
+        }
+
+        /**
          * Adds a new relocation rule
          *
          * @param relocation New relocation rule to add
@@ -326,6 +336,8 @@ public class PluginLib {
         private String relocationPrefix = null;
         @SerializedName("libraries-folder")
         private String librariesFolder = "libs";
+        @SerializedName("global-relocations")
+        private Map<String, String> globalRelocations = Collections.emptyMap();
         private Map<String, RuntimeLib> libraries = Collections.emptyMap();
     }
 
@@ -337,6 +349,7 @@ public class PluginLib {
         private String groupId = null, artifactId = null, version = null;
         private Map<String, String> relocation = null;
         private String repository = null;
+        private boolean isolated = false;
 
         Builder builder() {
             Builder b;
@@ -352,7 +365,6 @@ public class PluginLib {
             if (repository != null) b.repository(repository);
             return b;
         }
-
     }
 
     private static class StaticURLPluginLib extends PluginLib {
@@ -369,9 +381,8 @@ public class PluginLib {
         }
     }
 
-    @SuppressWarnings("ConstantConditions")
     private static final Supplier<File> libFile = Suppliers.memoize(() -> {
-        Map<?, ?> map = (Map<?, ?>) new Yaml().load(new InputStreamReader(DependentJavaPlugin.class.getClassLoader().getResourceAsStream("plugin.yml")));
+        Map<?, ?> map = (Map<?, ?>) new Yaml().load(new InputStreamReader(requireNonNull(DependentJavaPlugin.class.getClassLoader().getResourceAsStream("plugin.yml"), "Jar does not contain plugin.yml")));
         String name = map.get("name").toString();
         String folder = "libs";
         if (map.containsKey("runtime-libraries")) {
@@ -380,20 +391,26 @@ public class PluginLib {
             if (options.librariesFolder != null && !options.librariesFolder.isEmpty())
                 folder = options.librariesFolder;
             String prefix = options.relocationPrefix == null ? null : options.relocationPrefix;
-            Objects.requireNonNull(prefix, "relocation-prefix must be defined in runtime-libraries!");
+            requireNonNull(prefix, "relocation-prefix must be defined in runtime-libraries!");
+            Set<Relocation> globalRelocations = new HashSet<>();
+            for (Entry<String, String> global : options.globalRelocations.entrySet()) {
+                globalRelocations.add(new Relocation(global.getKey(), prefix + "." + global.getValue()));
+            }
             for (Entry<String, RuntimeLib> lib : options.libraries.entrySet()) {
                 RuntimeLib runtimeLib = lib.getValue();
                 Builder b = runtimeLib.builder();
                 if (runtimeLib.relocation != null && !runtimeLib.relocation.isEmpty())
                     for (Entry<String, String> s : runtimeLib.relocation.entrySet()) {
-                        b.relocate(new Relocation(s.getValue(), prefix + "." + s.getKey()));
+                        b.relocate(new Relocation(s.getKey(), prefix + "." + s.getValue()));
                     }
+                for (Relocation relocation : globalRelocations) {
+                    b.relocate(relocation);
+                }
                 toInstall.add(b.build());
             }
         }
         File file = new File(Bukkit.getUpdateFolderFile().getParentFile() + File.separator + name, folder);
         file.mkdirs();
         return file;
-    })::get;
-
+    });
 }
