@@ -358,7 +358,6 @@ public class PluginLib {
         private String groupId = null, artifactId = null, version = null;
         private Map<String, String> relocation = null;
         private String repository = null;
-        private boolean isolated = false;
 
         Builder builder() {
             Builder b;
