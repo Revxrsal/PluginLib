@@ -114,11 +114,13 @@ public class PluginLib {
             throw new RuntimeException("Unable to download dependency: " + artifactId);
         }
         if (hasRelocations) {
+            File old = saveLocation;
             File relocated = new File(parent, name + "-relocated.jar");
             if (!relocated.exists()) {
                 try {
                     relocated.createNewFile();
                     FileRelocator.remap(saveLocation, new File(parent, name + "-relocated.jar"), relocationRules);
+                    if (deleteAfterRelocation) old.delete();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -343,8 +345,13 @@ public class PluginLib {
 
         @SerializedName("relocation-prefix")
         private String relocationPrefix = null;
+
         @SerializedName("libraries-folder")
         private String librariesFolder = "libs";
+
+        @SerializedName("delete-after-relocation")
+        private boolean deleteAfterRelocation = false;
+
         @SerializedName("global-relocations")
         private Map<String, String> globalRelocations = Collections.emptyMap();
         private Map<String, RuntimeLib> libraries = Collections.emptyMap();
@@ -389,6 +396,8 @@ public class PluginLib {
         }
     }
 
+    private static boolean deleteAfterRelocation = false;
+
     private static final Supplier<File> libFile = Suppliers.memoize(() -> {
         Map<?, ?> map = (Map<?, ?>) new Yaml().load(new InputStreamReader(requireNonNull(DependentJavaPlugin.class.getClassLoader().getResourceAsStream("plugin.yml"), "Jar does not contain plugin.yml")));
         String name = map.get("name").toString();
@@ -396,6 +405,7 @@ public class PluginLib {
         if (map.containsKey("runtime-libraries")) {
             Gson gson = new Gson();
             LibrariesOptions options = gson.fromJson(gson.toJson(map.get("runtime-libraries")), LibrariesOptions.class);
+            deleteAfterRelocation = options.deleteAfterRelocation;
             if (options.librariesFolder != null && !options.librariesFolder.isEmpty())
                 folder = options.librariesFolder;
             String prefix = options.relocationPrefix == null ? null : options.relocationPrefix;

@@ -64,4 +64,9 @@ public abstract class FileRelocator {
         Object relocator = relocatorConstructor.newInstance(input, output, mappings);
         relocateMethod.invoke(relocator);
     }
+
+    private FileRelocator() {
+        throw new AssertionError("Cannot create instances of " + getClass().getName() + ".");
+    }
+
 }
