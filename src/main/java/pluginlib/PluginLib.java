@@ -3,8 +3,6 @@ package pluginlib;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSet;
-import com.google.gson.Gson;
-import com.google.gson.annotations.SerializedName;
 import org.bukkit.Bukkit;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.NotNull;
@@ -120,7 +118,6 @@ public class PluginLib {
                 try {
                     relocated.createNewFile();
                     FileRelocator.remap(saveLocation, new File(parent, name + "-relocated.jar"), relocationRules);
-                    if (deleteAfterRelocation) old.delete();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
@@ -170,7 +167,7 @@ public class PluginLib {
         try {
             addURL = URLClassLoader.class.getDeclaredMethod("addURL", URL.class);
             addURL.setAccessible(true);
-        } catch (NoSuchMethodException e) {
+        } catch (Throwable e) {
             e.printStackTrace();
         }
     }
@@ -343,18 +340,25 @@ public class PluginLib {
     @SuppressWarnings({"FieldCanBeLocal", "FieldMayBeFinal"})
     private static class LibrariesOptions {
 
-        @SerializedName("relocation-prefix")
         private String relocationPrefix = null;
-
-        @SerializedName("libraries-folder")
         private String librariesFolder = "libs";
-
-        @SerializedName("delete-after-relocation")
-        private boolean deleteAfterRelocation = false;
-
-        @SerializedName("global-relocations")
         private Map<String, String> globalRelocations = Collections.emptyMap();
         private Map<String, RuntimeLib> libraries = Collections.emptyMap();
+
+        public static LibrariesOptions fromMap(@NotNull Map<String, Object> map) {
+            LibrariesOptions options = new LibrariesOptions();
+            options.relocationPrefix = (String) map.get("relocation-prefix");
+            options.librariesFolder = (String) map.get("libraries-folder");
+            options.globalRelocations = (Map<String, String>) map.get("global-relocations");
+            options.libraries = new HashMap<>();
+            Map<String, Map<String, Object>> declaredLibs = (Map<String, Map<String, Object>>) map.get("libraries");
+            if (declaredLibs != null)
+                for (Entry<String, Map<String, Object>> lib : declaredLibs.entrySet()) {
+                    options.libraries.put(lib.getKey(), RuntimeLib.fromMap(lib.getValue()));
+                }
+            return options;
+        }
+
     }
 
     @SuppressWarnings({"FieldCanBeLocal", "FieldMayBeFinal"})
@@ -380,6 +384,19 @@ public class PluginLib {
             if (repository != null) b.repository(repository);
             return b;
         }
+
+        static RuntimeLib fromMap(Map<String, Object> map) {
+            RuntimeLib lib = new RuntimeLib();
+            lib.xml = (String) map.get("xml");
+            lib.url = (String) map.get("url");
+            lib.groupId = (String) map.get("groupId");
+            lib.artifactId = (String) map.get("artifactId");
+            lib.version = (String) map.get("version");
+            lib.repository = (String) map.get("repository");
+            lib.relocation = (Map<String, String>) map.get("relocation");
+            return lib;
+        }
+
     }
 
     private static class StaticURLPluginLib extends PluginLib {
@@ -396,16 +413,15 @@ public class PluginLib {
         }
     }
 
-    private static boolean deleteAfterRelocation = false;
 
     private static final Supplier<File> libFile = Suppliers.memoize(() -> {
         Map<?, ?> map = (Map<?, ?>) new Yaml().load(new InputStreamReader(requireNonNull(DependentJavaPlugin.class.getClassLoader().getResourceAsStream("plugin.yml"), "Jar does not contain plugin.yml")));
+
         String name = map.get("name").toString();
         String folder = "libs";
         if (map.containsKey("runtime-libraries")) {
-            Gson gson = new Gson();
-            LibrariesOptions options = gson.fromJson(gson.toJson(map.get("runtime-libraries")), LibrariesOptions.class);
-            deleteAfterRelocation = options.deleteAfterRelocation;
+            LibrariesOptions options = LibrariesOptions.fromMap(((Map<String, Object>) map.get("runtime-libraries")));
+
             if (options.librariesFolder != null && !options.librariesFolder.isEmpty())
                 folder = options.librariesFolder;
             String prefix = options.relocationPrefix == null ? null : options.relocationPrefix;
