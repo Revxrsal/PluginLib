@@ -348,8 +348,8 @@ public class PluginLib {
         public static LibrariesOptions fromMap(@NotNull Map<String, Object> map) {
             LibrariesOptions options = new LibrariesOptions();
             options.relocationPrefix = (String) map.get("relocation-prefix");
-            options.librariesFolder = (String) map.get("libraries-folder");
-            options.globalRelocations = (Map<String, String>) map.get("global-relocations");
+            options.librariesFolder = (String) map.getOrDefault("libraries-folder", "libs");
+            options.globalRelocations = (Map<String, String>) map.getOrDefault("global-relocations", Collections.emptyMap());
             options.libraries = new HashMap<>();
             Map<String, Map<String, Object>> declaredLibs = (Map<String, Map<String, Object>>) map.get("libraries");
             if (declaredLibs != null)
