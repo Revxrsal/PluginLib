@@ -1,8 +1,5 @@
 package pluginlib;
 
-import com.google.common.base.Supplier;
-import com.google.common.base.Suppliers;
-import com.google.common.collect.ImmutableSet;
 import org.bukkit.Bukkit;
 import org.intellij.lang.annotations.Language;
 import org.jetbrains.annotations.NotNull;
@@ -22,6 +19,7 @@ import java.net.URLClassLoader;
 import java.nio.file.Files;
 import java.util.*;
 import java.util.Map.Entry;
+import java.util.function.Supplier;
 
 import static java.nio.file.StandardCopyOption.REPLACE_EXISTING;
 import static java.util.Objects.requireNonNull;
@@ -35,15 +33,15 @@ import static java.util.Objects.requireNonNull;
 public class PluginLib {
 
     public final String groupId, artifactId, version, repository;
-    public final ImmutableSet<Relocation> relocationRules;
+    public final Set<Relocation> relocationRules;
     private final boolean hasRelocations;
 
-    public PluginLib(String groupId, String artifactId, String version, String repository, ImmutableSet<Relocation> relocationRules) {
+    public PluginLib(String groupId, String artifactId, String version, String repository, Set<Relocation> relocationRules) {
         this.groupId = groupId;
         this.artifactId = artifactId;
         this.version = version;
         this.repository = repository;
-        this.relocationRules = relocationRules;
+        this.relocationRules = Collections.unmodifiableSet(relocationRules);
         hasRelocations = !relocationRules.isEmpty();
     }
 
@@ -94,7 +92,11 @@ public class PluginLib {
      * @param clazz Class to use its {@link ClassLoader} to load.
      */
     public void load(Class<? extends DependentJavaPlugin> clazz) {
+        LibrariesOptions options = librariesOptions.get();
+        if (options == null) return;
         String name = artifactId + "-" + version;
+        if (!relocationRules.isEmpty())
+            name += "-relocated";
         File parent = libFile.get();
         File saveLocation = new File(parent, name + ".jar");
         if (!saveLocation.exists()) {
@@ -120,6 +122,9 @@ public class PluginLib {
                     FileRelocator.remap(saveLocation, new File(parent, name + "-relocated.jar"), relocationRules);
                 } catch (Exception e) {
                     e.printStackTrace();
+                } finally {
+                    if (options.deleteAfterRelocation)
+                        old.delete();
                 }
             }
             saveLocation = relocated;
@@ -176,7 +181,7 @@ public class PluginLib {
 
         private String url = null;
         private String group, artifact, version, repository = "https://repo1.maven.org/maven2/";
-        private final ImmutableSet.Builder<Relocation> relocations = ImmutableSet.builder();
+        private final Set<Relocation> relocations = new LinkedHashSet<>();
 
         protected Builder() {
         }
@@ -303,8 +308,8 @@ public class PluginLib {
          */
         public PluginLib build() {
             if (url != null)
-                return new StaticURLPluginLib(group, n(artifact, "artifactId"), n(version, "version"), repository, relocations.build(), url);
-            return new PluginLib(n(group, "groupId"), n(artifact, "artifactId"), n(version, "version"), n(repository, "repository"), relocations.build());
+                return new StaticURLPluginLib(group, n(artifact, "artifactId"), n(version, "version"), repository, relocations, url);
+            return new PluginLib(n(group, "groupId"), n(artifact, "artifactId"), n(version, "version"), n(repository, "repository"), relocations);
         }
 
         private static <T> T n(T t, String m) {
@@ -342,6 +347,7 @@ public class PluginLib {
 
         private String relocationPrefix = null;
         private String librariesFolder = "libs";
+        private boolean deleteAfterRelocation = false;
         private Map<String, String> globalRelocations = Collections.emptyMap();
         private Map<String, RuntimeLib> libraries = Collections.emptyMap();
 
@@ -350,6 +356,7 @@ public class PluginLib {
             options.relocationPrefix = (String) map.get("relocation-prefix");
             options.librariesFolder = (String) map.getOrDefault("libraries-folder", "libs");
             options.globalRelocations = (Map<String, String>) map.getOrDefault("global-relocations", Collections.emptyMap());
+            options.deleteAfterRelocation = (Boolean) map.getOrDefault("delete-after-relocation", false);
             options.libraries = new HashMap<>();
             Map<String, Map<String, Object>> declaredLibs = (Map<String, Map<String, Object>>) map.get("libraries");
             if (declaredLibs != null)
@@ -403,7 +410,7 @@ public class PluginLib {
 
         private final String url;
 
-        public StaticURLPluginLib(String groupId, String artifactId, String version, String repository, ImmutableSet<Relocation> relocationRules, String url) {
+        public StaticURLPluginLib(String groupId, String artifactId, String version, String repository, Set<Relocation> relocationRules, String url) {
             super(groupId, artifactId, version, repository, relocationRules);
             this.url = url;
         }
@@ -413,38 +420,77 @@ public class PluginLib {
         }
     }
 
-
-    private static final Supplier<File> libFile = Suppliers.memoize(() -> {
+    private static final Supplier<LibrariesOptions> librariesOptions = memoize(() -> {
         Map<?, ?> map = (Map<?, ?>) new Yaml().load(new InputStreamReader(requireNonNull(DependentJavaPlugin.class.getClassLoader().getResourceAsStream("plugin.yml"), "Jar does not contain plugin.yml")));
 
         String name = map.get("name").toString();
         String folder = "libs";
-        if (map.containsKey("runtime-libraries")) {
-            LibrariesOptions options = LibrariesOptions.fromMap(((Map<String, Object>) map.get("runtime-libraries")));
+        if (map.containsKey("runtime-libraries"))
+            return LibrariesOptions.fromMap(((Map<String, Object>) map.get("runtime-libraries")));
+        return null;
+    });
 
-            if (options.librariesFolder != null && !options.librariesFolder.isEmpty())
-                folder = options.librariesFolder;
-            String prefix = options.relocationPrefix == null ? null : options.relocationPrefix;
-            requireNonNull(prefix, "relocation-prefix must be defined in runtime-libraries!");
-            Set<Relocation> globalRelocations = new HashSet<>();
-            for (Entry<String, String> global : options.globalRelocations.entrySet()) {
-                globalRelocations.add(new Relocation(global.getKey(), prefix + "." + global.getValue()));
-            }
-            for (Entry<String, RuntimeLib> lib : options.libraries.entrySet()) {
-                RuntimeLib runtimeLib = lib.getValue();
-                Builder b = runtimeLib.builder();
-                if (runtimeLib.relocation != null && !runtimeLib.relocation.isEmpty())
-                    for (Entry<String, String> s : runtimeLib.relocation.entrySet()) {
-                        b.relocate(new Relocation(s.getKey(), prefix + "." + s.getValue()));
-                    }
-                for (Relocation relocation : globalRelocations) {
-                    b.relocate(relocation);
+    private static final Supplier<File> libFile = memoize(() -> {
+        Map<?, ?> map = (Map<?, ?>) new Yaml().load(new InputStreamReader(requireNonNull(DependentJavaPlugin.class.getClassLoader().getResourceAsStream("plugin.yml"), "Jar does not contain plugin.yml")));
+
+        String name = map.get("name").toString();
+
+        LibrariesOptions options = librariesOptions.get();
+
+        String folder = options.librariesFolder;
+        String prefix = options.relocationPrefix == null ? null : options.relocationPrefix;
+        requireNonNull(prefix, "relocation-prefix must be defined in runtime-libraries!");
+        Set<Relocation> globalRelocations = new HashSet<>();
+        for (Entry<String, String> global : options.globalRelocations.entrySet()) {
+            globalRelocations.add(new Relocation(global.getKey(), prefix + "." + global.getValue()));
+        }
+        for (Entry<String, RuntimeLib> lib : options.libraries.entrySet()) {
+            RuntimeLib runtimeLib = lib.getValue();
+            Builder b = runtimeLib.builder();
+            if (runtimeLib.relocation != null && !runtimeLib.relocation.isEmpty())
+                for (Entry<String, String> s : runtimeLib.relocation.entrySet()) {
+                    b.relocate(new Relocation(s.getKey(), prefix + "." + s.getValue()));
                 }
-                toInstall.add(b.build());
+            for (Relocation relocation : globalRelocations) {
+                b.relocate(relocation);
             }
+            toInstall.add(b.build());
         }
         File file = new File(Bukkit.getUpdateFolderFile().getParentFile() + File.separator + name, folder);
         file.mkdirs();
         return file;
     });
+
+    private static <T> Supplier<T> memoize(@NotNull Supplier<T> delegate) {
+        return new MemoizingSupplier<>(delegate);
+    }
+
+    // legally stolen from guava's Suppliers.memoize
+    static class MemoizingSupplier<T> implements Supplier<T>, Serializable {
+
+        final Supplier<T> delegate;
+        transient volatile boolean initialized;
+        // "value" does not need to be volatile; visibility piggy-backs
+        // on volatile read of "initialized".
+        transient T value;
+
+        MemoizingSupplier(Supplier<T> delegate) {
+            this.delegate = delegate;
+        }
+
+        @Override public T get() {
+            // A 2-field variant of Double Checked Locking.
+            if (!initialized) {
+                synchronized (this) {
+                    if (!initialized) {
+                        T t = delegate.get();
+                        value = t;
+                        initialized = true;
+                        return t;
+                    }
+                }
+            }
+            return value;
+        }
+    }
 }
