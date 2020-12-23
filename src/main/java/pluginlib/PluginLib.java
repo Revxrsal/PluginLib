@@ -95,10 +95,12 @@ public class PluginLib {
         LibrariesOptions options = librariesOptions.get();
         if (options == null) return;
         String name = artifactId + "-" + version;
-        if (!relocationRules.isEmpty())
-            name += "-relocated";
         File parent = libFile.get();
         File saveLocation = new File(parent, name + ".jar");
+        if (hasRelocations) {
+            File relocated = new File(parent, name + "-relocated.jar");
+            if (relocated.exists()) return;
+        }
         if (!saveLocation.exists()) {
             try {
                 URL url = asURL();
